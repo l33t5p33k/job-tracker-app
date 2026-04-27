@@ -43,6 +43,15 @@ cd job-tracker-app
 # Install dependencies
 pnpm install
 
+# Set up environment variables
+cp .env.example .env.local
+```
+
+Then open `.env.local` and fill in your Supabase credentials:
+- `VITE_SUPABASE_URL` — found in your Supabase project under Settings → Data API
+- `VITE_SUPABASE_ANON_KEY` — found under Settings → API Keys → Publishable key
+
+```bash
 # Start the dev server
 pnpm dev
 ```
