@@ -1,0 +1,227 @@
+.container {
+    min-height: 100vh;
+    padding: 24px;
+  }
+  
+  .inner {
+    max-width: 640px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  .title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fb923c;
+    margin: 0;
+  }
+  
+  .exportBtn {
+    font-size: 0.875rem;
+    background: #3f3f46;
+    border: none;
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  
+  .exportBtn:hover { background: #52525b; }
+  
+  .sessionBox {
+    background: #27272a;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  .sessionLabel {
+    font-size: 0.875rem;
+    color: #a1a1aa;
+    margin: 0 0 4px;
+  }
+  
+  .sessionTime {
+    font-size: 2rem;
+    font-family: monospace;
+    font-weight: 700;
+    margin: 0;
+  }
+  
+  .activeJob {
+    font-size: 0.75rem;
+    color: #fb923c;
+    margin: 4px 0 0;
+  }
+  
+  .clockBtn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    color: #fff;
+  }
+  
+  .clockIn  { background: #16a34a; }
+  .clockIn:hover  { background: #15803d; }
+  .clockOut { background: #dc2626; }
+  .clockOut:hover { background: #b91c1c; }
+  
+  .hint {
+    text-align: center;
+    color: #52525b;
+    font-size: 0.875rem;
+    margin: 0;
+  }
+  
+  .addRow {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .input {
+    flex: 1;
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    border-radius: 8px;
+    padding: 10px 16px;
+    color: #fff;
+    font-size: 1rem;
+    outline: none;
+  }
+  
+  .input::placeholder { color: #71717a; }
+  .input:focus { border-color: #fb923c; }
+  
+  .addBtn {
+    background: #ea580c;
+    border: none;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  
+  .addBtn:hover { background: #c2410c; }
+  
+  .jobList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .empty {
+    text-align: center;
+    color: #3f3f46;
+    padding: 48px 0;
+  }
+  
+  .jobRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid #3f3f46;
+    background: #27272a;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  
+  .jobRow:hover { border-color: #71717a; }
+  
+  .jobRowActive {
+    background: rgba(251, 146, 60, 0.08);
+    border-color: #fb923c;
+  }
+  
+  .jobRowDisabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .jobLeft {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #3f3f46;
+  }
+  
+  .dotActive {
+    background: #fb923c;
+    animation: pulse 1.5s infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  
+  .jobName { font-weight: 500; }
+  
+  .jobRight {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  
+  .jobTime {
+    font-family: monospace;
+    font-size: 1.1rem;
+  }
+  
+  .deleteBtn {
+    background: none;
+    border: none;
+    color: #52525b;
+    font-size: 1.4rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+  }
+  
+  .deleteBtn:hover { color: #ef4444; }
+  
+  .resetRow {
+    text-align: center;
+  }
+  
+  .resetBtn {
+    background: none;
+    border: none;
+    color: #52525b;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  
+  .resetBtn:hover { color: #ef4444; }
+
+  .generalRow {
+    cursor: default;
+    border-color: #52525b;
+  }
+  
+  .generalHint {
+    font-size: 0.75rem;
+    color: #71717a;
+  }
