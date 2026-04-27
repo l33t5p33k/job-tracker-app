@@ -62,12 +62,9 @@ Speed up your git workflow by adding these aliases to your `~/.gitconfig`:
 	st = status
 	co = checkout
 	br = branch
-	lg = log --oneline --graph --decorate --all
 	psho = push origin
-	psh = push origin HEAD
-	pl = pull --rebase origin HEAD
-	pro = pull rebase origin main
-	drb = push origin --delete
+	pro = pull --rebase origin
+	a = add --all
 ```
 
 Now instead of typing `git status` you type `git st`, `git push origin HEAD` becomes `git psh`, etc.
