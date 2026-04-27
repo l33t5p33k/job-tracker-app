@@ -413,7 +413,7 @@ export default function App() {
 
         {/* Header */}
         <div className={styles.header}>
-          <h1 className={styles.title}>⚙️ Metal Shop Timer</h1>
+          <h1 className={styles.title}>🔥 Shop Timer</h1>
           <button className={styles.exportBtn} onClick={() => exportToCSV(jobs, getTotalDisplaySeconds(), tab)}>
             Export CSV
           </button>
