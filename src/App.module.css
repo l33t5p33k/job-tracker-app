@@ -225,3 +225,54 @@
     font-size: 0.75rem;
     color: #71717a;
   }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: #27272a;
+    padding: 4px;
+    border-radius: 10px;
+  }
+  
+  .tab {
+    flex: 1;
+    background: none;
+    border: none;
+    color: #71717a;
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  
+  .tab:hover { color: #fff; }
+  
+  .tabActive {
+    background: #3f3f46;
+    color: #fff;
+  }
+
+  .shareRow {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .shareBtn {
+    flex: 1;
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    color: #fff;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  
+  .shareBtn:hover {
+    border-color: #fb923c;
+    color: #fb923c;
+  }

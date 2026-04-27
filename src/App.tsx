@@ -64,6 +64,47 @@ function exportToCSV(jobs: Job[], sessionSeconds: number, tab: 'today' | 'week')
   URL.revokeObjectURL(url)
 }
 
+function formatHoursMinutes(seconds: number): string {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  if (h === 0) return `${m}m`
+  if (m === 0) return `${h}h`
+  return `${h}h ${m}m`
+}
+
+function buildWeeklySummary(jobs: Job[]): string {
+  const weekStart = getWeekStart()
+  const date = new Date(weekStart)
+  const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
+  const lines = jobs
+    .filter(j => (j.weeklySeconds ?? 0) > 0)
+    .map(j => `${j.name.padEnd(20)} ${formatHoursMinutes(j.weeklySeconds ?? 0)}`)
+
+  const total = jobs.reduce((sum, j) => sum + (j.weeklySeconds ?? 0), 0)
+
+  return [
+    `⚙️ Time Tracker — Week of ${formatted}`,
+    '',
+    ...lines,
+    '',
+    `Total: ${formatHoursMinutes(total)}`
+  ].join('\n')
+}
+
+function shareViaEmail(jobs: Job[]) {
+  const summary = buildWeeklySummary(jobs)
+  const subject = encodeURIComponent(`Weekly Hours`)
+  const body = encodeURIComponent(summary)
+  window.open(`mailto:?subject=${subject}&body=${body}`)
+}
+
+function shareViaText(jobs: Job[]) {
+  const summary = buildWeeklySummary(jobs)
+  const body = encodeURIComponent(summary)
+  window.open(`sms:?&body=${body}`)
+}
+
 export default function App() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [session, setSession] = useState<Session | null>(null)
@@ -424,7 +465,7 @@ export default function App() {
               <div className={`${styles.dot} ${generalJob.isRunning && tab === 'today' ? styles.dotActive : ''}`} />
               <div>
                 <span className={styles.jobName}>General</span>
-                <span className={styles.generalHint}> — unallocated shop time</span>
+                <span className={styles.generalHint}> — miscellaneous shop prep</span>
               </div>
             </div>
             <div className={styles.jobRight}>
@@ -481,6 +522,18 @@ export default function App() {
             )
           })}
         </div>
+
+        {/* Share buttons — only on week tab */}
+        {tab === 'week' && (
+          <div className={styles.shareRow}>
+            <button className={styles.shareBtn} onClick={() => shareViaEmail(jobs)}>
+              ✉️ Send via Email
+            </button>
+            <button className={styles.shareBtn} onClick={() => shareViaText(jobs)}>
+              💬 Send via Text
+            </button>
+          </div>
+        )}
 
       </div>
     </div>
