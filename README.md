@@ -1,73 +1,103 @@
-# React + TypeScript + Vite
+# ⚙️ Metal Shop Timer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A time tracking app built for a metal working shop. Track hours spent on individual jobs so you can fairly allocate and charge time to each client.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## What It Does
 
-## React Compiler
+- **Clock In / Clock Out** to track your total work session
+- **Add jobs** by name (e.g. client name, home address, company name)
+- **Click a job** to start its timer — clicking another job automatically stops the previous one
+- **General time** is tracked automatically whenever you're clocked in but not on a specific job (e.g. shop cleanup, admin, unallocated work)
+- **Export to CSV** to get a summary of all job times for invoicing
+- **Persists between sessions** — closing the browser won't lose your data
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## Tech Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- [React](https://react.dev) + [TypeScript](https://www.typescriptlang.org/)
+- [Vite](https://vitejs.dev/) (dev server + bundler)
+- CSS Modules (scoped component styles)
+- `localStorage` for persistence
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Getting Started
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Prerequisites
+
+- Node.js (via [nvm](https://github.com/nvm-sh/nvm))
+- [pnpm](https://pnpm.io/)
+
+### Install & Run
+
+```bash
+# Clone the repo
+gh repo clone l33t5p33k/job-tracker-app
+
+# Navigate into it
+cd job-tracker-app
+
+# Install dependencies
+pnpm install
+
+# Start the dev server
+pnpm dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Then open [http://localhost:5173](http://localhost:5173) in your browser.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+---
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Developer Setup Tips
+
+### Git Aliases
+
+Speed up your git workflow by adding these aliases to your `~/.gitconfig`:
+
+```ini
+[alias]
+	st = status
+	co = checkout
+	br = branch
+	lg = log --oneline --graph --decorate --all
+	psho = push origin
+	psh = push origin HEAD
+	pl = pull --rebase origin HEAD
+	pro = pull rebase origin main
+	drb = push origin --delete
+```
+
+Now instead of typing `git status` you type `git st`, `git push origin HEAD` becomes `git psh`, etc.
+
+### Colorized Terminal Prompt with Git Branch
+
+Add this to your `~/.zshrc` to get a color-coded prompt that shows your current folder and git branch:
+
+```bash
+# Git branch in prompt
+git_branch() {
+  git symbolic-ref --short HEAD 2>/dev/null
+}
+
+# Colors
+autoload -U colors && colors
+
+# Custom prompt: cyan folder, magenta branch, green ❯
+setopt PROMPT_SUBST
+PROMPT='%{$fg[cyan]%}%3~%{$reset_color%} %{$fg[magenta]%}$(git_branch)%{$reset_color%} %{$fg[green]%}❯%{$reset_color%} '
+```
+
+Your prompt will look like:
+
+```
+~/Developer/job-tracker-app main ❯
+```
+
+Then reload your terminal config:
+
+```bash
+source ~/.zshrc
 ```
