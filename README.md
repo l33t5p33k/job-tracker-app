@@ -20,7 +20,7 @@ A time tracking app built for a metal working shop. Track hours spent on individ
 - [React](https://react.dev) + [TypeScript](https://www.typescriptlang.org/)
 - [Vite](https://vitejs.dev/) (dev server + bundler)
 - CSS Modules (scoped component styles)
-- `localStorage` for persistence
+- Supabase for storage
 
 ---
 
@@ -64,7 +64,7 @@ Speed up your git workflow by adding these aliases to your `~/.gitconfig`:
 	br = branch
 	psho = push origin
 	pro = pull --rebase origin
-	a = add --all
+	a = add .
 ```
 
 Now instead of typing `git status` you type `git st`, `git push origin HEAD` becomes `git psh`, etc.

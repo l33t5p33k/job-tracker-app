@@ -10,6 +10,7 @@ interface Job {
   isRunning?: boolean
   startedAt?: number | null
   totalSeconds?: number
+  weeklySeconds?: number
 }
 
 interface Session {
@@ -35,19 +36,30 @@ function formatTime(seconds: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-function exportToCSV(jobs: Job[], sessionSeconds: number) {
+function getWeekStart(): string {
+  const now = new Date()
+  const day = now.getDay()
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1)
+  const monday = new Date(now.setDate(diff))
+  return monday.toISOString().slice(0, 10)
+}
+
+function exportToCSV(jobs: Job[], sessionSeconds: number, tab: 'today' | 'week') {
   const rows = [
     ['Job Name', 'Total Time'],
-    ...jobs.map(j => [j.name, formatTime(j.totalSeconds ?? 0)]),
+    ...jobs.map(j => [
+      j.name,
+      formatTime(tab === 'today' ? (j.totalSeconds ?? 0) : (j.weeklySeconds ?? 0))
+    ]),
     [],
-    ['Total Session Time', formatTime(sessionSeconds)]
+    [tab === 'today' ? 'Total Session Time' : 'Total Week Time', formatTime(sessionSeconds)]
   ]
   const csv = rows.map(r => r.join(',')).join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `job-times-${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `job-times-${tab}-${new Date().toISOString().slice(0, 10)}.csv`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -58,6 +70,7 @@ export default function App() {
   const [activeEntry, setActiveEntry] = useState<TimeEntry | null>(null)
   const [newJobName, setNewJobName] = useState('')
   const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<'today' | 'week'>('today')
   const [, setTick] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const sessionSecondsRef = useRef(0)
@@ -81,12 +94,21 @@ export default function App() {
       .order('is_general', { ascending: false })
       .order('created_at', { ascending: true })
 
+    // Today's entries
     const today = new Date().toISOString().slice(0, 10)
-    const { data: entriesData } = await supabase
+    const { data: todayEntries } = await supabase
       .from('time_entries')
       .select('*')
       .gte('started_at', `${today}T00:00:00`)
 
+    // This week's entries
+    const weekStart = getWeekStart()
+    const { data: weekEntries } = await supabase
+      .from('time_entries')
+      .select('*')
+      .gte('started_at', `${weekStart}T00:00:00`)
+
+    // Open session
     const { data: sessionResults } = await supabase
       .from('sessions')
       .select('*')
@@ -94,6 +116,7 @@ export default function App() {
       .order('clocked_in_at', { ascending: false })
       .limit(1)
 
+    // Open time entry
     const { data: openEntries } = await supabase
       .from('time_entries')
       .select('*')
@@ -104,11 +127,23 @@ export default function App() {
     const sessionData = sessionResults?.[0] ?? null
     const openEntry = openEntries?.[0] ?? null
 
-    const totalsMap: Record<string, number> = {}
-    if (entriesData) {
-      for (const entry of entriesData) {
-        const secs = entry.duration_seconds ?? 0
-        totalsMap[entry.job_id] = (totalsMap[entry.job_id] ?? 0) + secs
+    // Build today totals map
+    const todayTotals: Record<string, number> = {}
+    if (todayEntries) {
+      for (const entry of todayEntries) {
+        if (entry.duration_seconds) {
+          todayTotals[entry.job_id] = (todayTotals[entry.job_id] ?? 0) + entry.duration_seconds
+        }
+      }
+    }
+
+    // Build weekly totals map
+    const weekTotals: Record<string, number> = {}
+    if (weekEntries) {
+      for (const entry of weekEntries) {
+        if (entry.duration_seconds) {
+          weekTotals[entry.job_id] = (weekTotals[entry.job_id] ?? 0) + entry.duration_seconds
+        }
       }
     }
 
@@ -116,7 +151,8 @@ export default function App() {
       ...job,
       isRunning: openEntry?.job_id === job.id,
       startedAt: openEntry?.job_id === job.id ? new Date(openEntry.started_at).getTime() : null,
-      totalSeconds: totalsMap[job.id] ?? 0
+      totalSeconds: todayTotals[job.id] ?? 0,
+      weeklySeconds: weekTotals[job.id] ?? 0
     }))
 
     setJobs(mergedJobs)
@@ -132,13 +168,19 @@ export default function App() {
   }
 
   function getSessionSeconds(): number {
-    if (!session || !sessionStartRef.current) return 0
+    if (!session || !sessionStartRef.current) return sessionSecondsRef.current
     return sessionSecondsRef.current + Math.floor((Date.now() - sessionStartRef.current) / 1000)
   }
 
   function getLiveSeconds(job: Job): number {
-    if (!job.isRunning || !job.startedAt) return job.totalSeconds ?? 0
-    return (job.totalSeconds ?? 0) + Math.floor((Date.now() - job.startedAt) / 1000)
+    const base = tab === 'today' ? (job.totalSeconds ?? 0) : (job.weeklySeconds ?? 0)
+    if (!job.isRunning || !job.startedAt) return base
+    return base + Math.floor((Date.now() - job.startedAt) / 1000)
+  }
+
+  function getTotalDisplaySeconds(): number {
+    if (tab === 'today') return getSessionSeconds()
+    return jobs.reduce((sum, j) => sum + getLiveSeconds(j), 0)
   }
 
   async function handleClockIn() {
@@ -183,6 +225,21 @@ export default function App() {
         .from('time_entries')
         .update({ ended_at: now, duration_seconds: duration })
         .eq('id', activeEntry.id)
+
+      // Update local totals immediately so they stay visible
+      setJobs(prev => prev.map(j =>
+        j.id === activeEntry.job_id
+          ? {
+              ...j,
+              isRunning: false,
+              startedAt: null,
+              totalSeconds: (j.totalSeconds ?? 0) + duration,
+              weeklySeconds: (j.weeklySeconds ?? 0) + duration
+            }
+          : { ...j, isRunning: false, startedAt: null }
+      ))
+    } else {
+      setJobs(prev => prev.map(j => ({ ...j, isRunning: false, startedAt: null })))
     }
 
     await supabase
@@ -190,11 +247,11 @@ export default function App() {
       .update({ clocked_out_at: now, total_seconds: totalSeconds })
       .eq('id', session.id)
 
+    // Keep session seconds visible after clock out
+    sessionSecondsRef.current = totalSeconds
+    sessionStartRef.current = null
     setSession(null)
     setActiveEntry(null)
-    sessionStartRef.current = null
-    sessionSecondsRef.current = 0
-    setJobs(prev => prev.map(j => ({ ...j, isRunning: false, startedAt: null })))
   }
 
   async function handleJobClick(jobId: string) {
@@ -213,7 +270,13 @@ export default function App() {
 
         setJobs(prev => prev.map(j =>
           j.id === jobId
-            ? { ...j, isRunning: false, startedAt: null, totalSeconds: (j.totalSeconds ?? 0) + duration }
+            ? {
+                ...j,
+                isRunning: false,
+                startedAt: null,
+                totalSeconds: (j.totalSeconds ?? 0) + duration,
+                weeklySeconds: (j.weeklySeconds ?? 0) + duration
+              }
             : j
         ))
       }
@@ -243,7 +306,13 @@ export default function App() {
 
         setJobs(prev => prev.map(j =>
           j.id === activeEntry.job_id
-            ? { ...j, isRunning: false, startedAt: null, totalSeconds: (j.totalSeconds ?? 0) + duration }
+            ? {
+                ...j,
+                isRunning: false,
+                startedAt: null,
+                totalSeconds: (j.totalSeconds ?? 0) + duration,
+                weeklySeconds: (j.weeklySeconds ?? 0) + duration
+              }
             : j
         ))
       }
@@ -272,7 +341,7 @@ export default function App() {
       .single()
 
     if (data) {
-      setJobs(prev => [...prev, { ...data, isRunning: false, startedAt: null, totalSeconds: 0 }])
+      setJobs(prev => [...prev, { ...data, isRunning: false, startedAt: null, totalSeconds: 0, weeklySeconds: 0 }])
       setNewJobName('')
     }
   }
@@ -301,33 +370,58 @@ export default function App() {
     <div className={styles.container}>
       <div className={styles.inner}>
 
+        {/* Header */}
         <div className={styles.header}>
           <h1 className={styles.title}>⚙️ Metal Shop Timer</h1>
-          <button className={styles.exportBtn} onClick={() => exportToCSV(jobs, getSessionSeconds())}>
+          <button className={styles.exportBtn} onClick={() => exportToCSV(jobs, getTotalDisplaySeconds(), tab)}>
             Export CSV
           </button>
         </div>
 
-        <div className={styles.sessionBox}>
-          <div>
-            <p className={styles.sessionLabel}>Session Time</p>
-            <p className={styles.sessionTime}>{formatTime(getSessionSeconds())}</p>
-            {activeJob && <p className={styles.activeJob}>▶ {activeJob.name}</p>}
-          </div>
+        {/* Tabs */}
+        <div className={styles.tabs}>
           <button
-            className={`${styles.clockBtn} ${isClockedIn ? styles.clockOut : styles.clockIn}`}
-            onClick={isClockedIn ? handleClockOut : handleClockIn}
+            className={`${styles.tab} ${tab === 'today' ? styles.tabActive : ''}`}
+            onClick={() => setTab('today')}
           >
-            {isClockedIn ? 'Clock Out' : 'Clock In'}
+            Today
+          </button>
+          <button
+            className={`${styles.tab} ${tab === 'week' ? styles.tabActive : ''}`}
+            onClick={() => setTab('week')}
+          >
+            This Week
           </button>
         </div>
 
-        {!isClockedIn && <p className={styles.hint}>Clock in to start tracking jobs</p>}
+        {/* Clock In/Out */}
+        <div className={styles.sessionBox}>
+          <div>
+            <p className={styles.sessionLabel}>
+              {tab === 'today' ? 'Session Time' : 'Week Total'}
+            </p>
+            <p className={styles.sessionTime}>{formatTime(getTotalDisplaySeconds())}</p>
+            {activeJob && <p className={styles.activeJob}>▶ {activeJob.name}</p>}
+          </div>
+          {tab === 'today' && (
+            <button
+              className={`${styles.clockBtn} ${isClockedIn ? styles.clockOut : styles.clockIn}`}
+              onClick={isClockedIn ? handleClockOut : handleClockIn}
+            >
+              {isClockedIn ? 'Clock Out' : 'Clock In'}
+            </button>
+          )}
+        </div>
 
+        {tab === 'today' && !isClockedIn && (
+          <p className={styles.hint}>Clock in to start tracking jobs</p>
+        )}
+
+        {/* General */}
         {generalJob && (
-          <div className={`${styles.jobRow} ${generalJob.isRunning ? styles.jobRowActive : ''} ${!isClockedIn ? styles.jobRowDisabled : ''} ${styles.generalRow}`}>
+          <div className={`${styles.jobRow} ${generalJob.isRunning && tab === 'today' ? styles.jobRowActive : ''} ${!isClockedIn || tab === 'week' ? styles.jobRowDisabled : ''} ${styles.generalRow}`}>
             <div className={styles.jobLeft}>
-              <div className={`${styles.dot} ${generalJob.isRunning ? styles.dotActive : ''}`} />
+              <div className={`${styles.dot} ${generalJob.isRunning && tab === 'today' ? styles.dotActive : ''}`} />
               <div>
                 <span className={styles.jobName}>General</span>
                 <span className={styles.generalHint}> — unallocated shop time</span>
@@ -339,35 +433,49 @@ export default function App() {
           </div>
         )}
 
-        <div className={styles.addRow}>
-          <input
-            className={styles.input}
-            type="text"
-            value={newJobName}
-            onChange={e => setNewJobName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addJob()}
-            placeholder="Job name or address..."
-          />
-          <button className={styles.addBtn} onClick={addJob}>+ Add</button>
-        </div>
+        {/* Add Job — only show on Today tab */}
+        {tab === 'today' && (
+          <div className={styles.addRow}>
+            <input
+              className={styles.input}
+              type="text"
+              value={newJobName}
+              onChange={e => setNewJobName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addJob()}
+              placeholder="Job name or address..."
+            />
+            <button className={styles.addBtn} onClick={addJob}>+ Add</button>
+          </div>
+        )}
 
+        {/* Job List */}
         <div className={styles.jobList}>
-          {specificJobs.length === 0 && <p className={styles.empty}>No jobs yet — add one above</p>}
+          {specificJobs.length === 0 && (
+            <p className={styles.empty}>
+              {tab === 'today' ? 'No jobs yet — add one above' : 'No jobs tracked this week'}
+            </p>
+          )}
           {specificJobs.map(job => {
             const rowClass = [
               styles.jobRow,
-              job.isRunning ? styles.jobRowActive : '',
-              !isClockedIn ? styles.jobRowDisabled : ''
+              job.isRunning && tab === 'today' ? styles.jobRowActive : '',
+              !isClockedIn || tab === 'week' ? styles.jobRowDisabled : ''
             ].join(' ')
             return (
-              <div key={job.id} className={rowClass} onClick={() => handleJobClick(job.id)}>
+              <div
+                key={job.id}
+                className={rowClass}
+                onClick={() => tab === 'today' && handleJobClick(job.id)}
+              >
                 <div className={styles.jobLeft}>
-                  <div className={`${styles.dot} ${job.isRunning ? styles.dotActive : ''}`} />
+                  <div className={`${styles.dot} ${job.isRunning && tab === 'today' ? styles.dotActive : ''}`} />
                   <span className={styles.jobName}>{job.name}</span>
                 </div>
                 <div className={styles.jobRight}>
                   <span className={styles.jobTime}>{formatTime(getLiveSeconds(job))}</span>
-                  <button className={styles.deleteBtn} onClick={e => { e.stopPropagation(); deleteJob(job.id) }}>×</button>
+                  {tab === 'today' && (
+                    <button className={styles.deleteBtn} onClick={e => { e.stopPropagation(); deleteJob(job.id) }}>×</button>
+                  )}
                 </div>
               </div>
             )
