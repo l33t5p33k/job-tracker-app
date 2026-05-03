@@ -91,9 +91,23 @@ git_branch() {
 # Colors
 autoload -U colors && colors
 
-# Custom prompt: cyan folder, magenta branch, green ❯
+git_branch() {
+  git symbolic-ref --short HEAD 2>/dev/null
+}
+
+rainbow_path() {
+  local parts=("${(@s:/:)${(%):-%3~}}")
+  local colors=(197 208 227 48 51 213)
+  local out=""
+  for i in {1..${#parts}}; do
+    out+="%F{${colors[$i]}}${parts[$i]}"
+    [[ $i -lt ${#parts} ]] && out+="/"
+  done
+  echo -n "$out"
+}
+
 setopt PROMPT_SUBST
-PROMPT='%{$fg[cyan]%}%3~%{$reset_color%} %{$fg[magenta]%}$(git_branch)%{$reset_color%} %{$fg[green]%}❯%{$reset_color%} '
+PROMPT='$(rainbow_path)%{$reset_color%} %F{48}$(git_branch)%{$reset_color%} %F{197}❯%F{208}❯%F{227}❯%{$reset_color%} '
 ```
 
 Your prompt will look like:
