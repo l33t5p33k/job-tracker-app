@@ -113,7 +113,7 @@ PROMPT='$(rainbow_path)%{$reset_color%} %F{48}$(git_branch)%{$reset_color%} %F{1
 Your prompt will look like:
 
 ```
-~/Developer/job-tracker-app main ❯
+~/Developer/job-tracker-app main ❯❯❯
 ```
 
 Then reload your terminal config:
