@@ -139,8 +139,16 @@ export default function App() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [])
 
+  const hasLoadedRef = useRef(false)
+
   useEffect(() => {
-    if (authSession) loadData()
+    if (authSession && !hasLoadedRef.current) {
+      hasLoadedRef.current = true
+      loadData()
+    }
+    if (!authSession) {
+      hasLoadedRef.current = false
+    }
   }, [authSession])
 
   async function handleSignOut() {
@@ -153,6 +161,7 @@ export default function App() {
     const { data: jobsData } = await supabase
       .from('jobs')
       .select('*')
+      .eq('archived', false)
       .order('is_general', { ascending: false })
       .order('created_at', { ascending: true })
 
@@ -178,16 +187,23 @@ export default function App() {
       .order('clocked_in_at', { ascending: false })
       .limit(1)
 
-    // Open time entry
-    const { data: openEntries } = await supabase
-      .from('time_entries')
-      .select('*')
-      .is('ended_at', null)
-      .order('started_at', { ascending: false })
-      .limit(1)
-
     const sessionData = sessionResults?.[0] ?? null
-    const openEntry = openEntries?.[0] ?? null
+
+    // Open time entry — only trust one that belongs to the currently open
+    // session. Otherwise a leftover entry that never got closed (dropped
+    // connection, app killed mid-shift, etc.) gets picked up as "still
+    // running" forever, even after clocking out.
+    let openEntry: TimeEntry | null = null
+    if (sessionData) {
+      const { data: openEntries } = await supabase
+        .from('time_entries')
+        .select('*')
+        .eq('session_id', sessionData.id)
+        .is('ended_at', null)
+        .order('started_at', { ascending: false })
+        .limit(1)
+      openEntry = openEntries?.[0] ?? null
+    }
 
     // Build today totals map
     const todayTotals: Record<string, number> = {}
@@ -212,7 +228,7 @@ export default function App() {
     const mergedJobs = (jobsData ?? []).map(job => ({
       ...job,
       isRunning: openEntry?.job_id === job.id,
-      startedAt: openEntry?.job_id === job.id ? new Date(openEntry.started_at).getTime() : null,
+      startedAt: openEntry && openEntry.job_id === job.id ? new Date(openEntry.started_at).getTime() : null,
       totalSeconds: todayTotals[job.id] ?? 0,
       weeklySeconds: weekTotals[job.id] ?? 0
     }))
@@ -283,10 +299,15 @@ export default function App() {
 
     if (activeEntry?.id) {
       const duration = Math.floor((Date.now() - new Date(activeEntry.started_at).getTime()) / 1000)
-      await supabase
+      const { error } = await supabase
         .from('time_entries')
         .update({ ended_at: now, duration_seconds: duration })
         .eq('id', activeEntry.id)
+
+      if (error) {
+        alert('Clock out failed to save — check your connection and try again.')
+        return
+      }
 
       // Update local totals immediately so they stay visible
       setJobs(prev => prev.map(j =>
@@ -304,10 +325,15 @@ export default function App() {
       setJobs(prev => prev.map(j => ({ ...j, isRunning: false, startedAt: null })))
     }
 
-    await supabase
+    const { error: sessionError } = await supabase
       .from('sessions')
       .update({ clocked_out_at: now, total_seconds: totalSeconds })
       .eq('id', session.id)
+
+    if (sessionError) {
+      alert('Clock out failed to save — check your connection and try again.')
+      return
+    }
 
     // Keep session seconds visible after clock out
     sessionSecondsRef.current = totalSeconds
@@ -325,10 +351,15 @@ export default function App() {
     if (clickedJob.isRunning) {
       if (activeEntry?.id) {
         const duration = Math.floor((Date.now() - new Date(activeEntry.started_at).getTime()) / 1000)
-        await supabase
+        const { error } = await supabase
           .from('time_entries')
           .update({ ended_at: now, duration_seconds: duration })
           .eq('id', activeEntry.id)
+
+        if (error) {
+          alert('Failed to save — check your connection and try again.')
+          return
+        }
 
         setJobs(prev => prev.map(j =>
           j.id === jobId
@@ -361,10 +392,15 @@ export default function App() {
     } else {
       if (activeEntry?.id) {
         const duration = Math.floor((Date.now() - new Date(activeEntry.started_at).getTime()) / 1000)
-        await supabase
+        const { error } = await supabase
           .from('time_entries')
           .update({ ended_at: now, duration_seconds: duration })
           .eq('id', activeEntry.id)
+
+        if (error) {
+          alert('Failed to save — check your connection and try again.')
+          return
+        }
 
         setJobs(prev => prev.map(j =>
           j.id === activeEntry.job_id
@@ -408,8 +444,15 @@ export default function App() {
     }
   }
 
-  async function deleteJob(id: string) {
-    await supabase.from('jobs').delete().eq('id', id)
+  async function archiveJob(id: string, name: string) {
+    if (!window.confirm(`Remove "${name}"? Its tracked hours will be kept, but it will no longer show in the list.`)) {
+      return
+    }
+    const { error } = await supabase.from('jobs').update({ archived: true }).eq('id', id)
+    if (error) {
+      alert(`Couldn't remove "${name}" — check your connection and try again.`)
+      return
+    }
     setJobs(prev => prev.filter(j => j.id !== id))
   }
 
@@ -555,7 +598,7 @@ export default function App() {
                 <div className={styles.jobRight}>
                   <span className={styles.jobTime}>{formatTime(getLiveSeconds(job))}</span>
                   {tab === 'today' && (
-                    <button className={styles.deleteBtn} onClick={e => { e.stopPropagation(); deleteJob(job.id) }}>×</button>
+                    <button className={styles.deleteBtn} onClick={e => { e.stopPropagation(); archiveJob(job.id, job.name) }}>×</button>
                   )}
                 </div>
               </div>
