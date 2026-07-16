@@ -1,0 +1,76 @@
+.container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #0D0805;
+}
+
+.card {
+  width: 100%;
+  max-width: 360px;
+  background: #0D2B2E;
+  border: 2px solid #1BC8D4;
+  border-radius: 16px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1BC8D4;
+  margin: 0;
+  text-align: center;
+  font-family: 'Sedgwick Ave Display', cursive;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: #F2C14A;
+  margin: 0 0 16px;
+  text-align: center;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.input {
+  background: #1A0D2E;
+  border: 2px solid #1BC8D4;
+  border-radius: 8px;
+  padding: 10px 16px;
+  color: #E8E8D0;
+  font-size: 1rem;
+  outline: none;
+}
+
+.input::placeholder { color: #F2C14A; }
+.input:focus { border-color: #39FF14; }
+
+.error {
+  color: #C44A1A;
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
+.submitBtn {
+  background: #E8820A;
+  border: none;
+  color: #0D0805;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.submitBtn:hover:not(:disabled) { background: #c96f08; }
+.submitBtn:disabled { opacity: 0.6; cursor: not-allowed; }

@@ -50,6 +50,26 @@ body {
   color: #fff;
 }
 
+.headerActions {
+  display: flex;
+  gap: 8px;
+}
+
+.signOutBtn {
+  font-size: 0.875rem;
+  background: none;
+  border: 1px solid #C44A1A;
+  color: #C44A1A;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.signOutBtn:hover {
+  background: #C44A1A;
+  color: #E8E8D0;
+}
+
 .tabs {
   display: flex;
   gap: 4px;

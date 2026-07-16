@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
+import type { Session as AuthSession } from '@supabase/supabase-js'
 import { supabase } from './supabaseClient'
+import Login from './Login'
 import styles from './App.module.css'
 
 interface Job {
@@ -106,6 +108,8 @@ function shareViaText(jobs: Job[]) {
 }
 
 export default function App() {
+  const [authSession, setAuthSession] = useState<AuthSession | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
   const [jobs, setJobs] = useState<Job[]>([])
   const [session, setSession] = useState<Session | null>(null)
   const [activeEntry, setActiveEntry] = useState<TimeEntry | null>(null)
@@ -118,13 +122,30 @@ export default function App() {
   const sessionStartRef = useRef<number | null>(null)
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthSession(data.session)
+      setAuthLoading(false)
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthSession(session)
+    })
+
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
     intervalRef.current = setInterval(() => setTick(t => t + 1), 1000)
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [])
 
   useEffect(() => {
-    loadData()
-  }, [])
+    if (authSession) loadData()
+  }, [authSession])
+
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+  }
 
   async function loadData() {
     setLoading(true)
@@ -397,6 +418,20 @@ export default function App() {
   const activeJob = jobs.find(j => j.isRunning)
   const isClockedIn = !!session
 
+  if (authLoading) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.inner}>
+          <p style={{ color: '#71717a', textAlign: 'center', paddingTop: '48px' }}>Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!authSession) {
+    return <Login />
+  }
+
   if (loading) {
     return (
       <div className={styles.container}>
@@ -414,9 +449,14 @@ export default function App() {
         {/* Header */}
         <div className={styles.header}>
           <h1 className={styles.title}>🔥 Shop Timer</h1>
-          <button className={styles.exportBtn} onClick={() => exportToCSV(jobs, getTotalDisplaySeconds(), tab)}>
-            Export CSV
-          </button>
+          <div className={styles.headerActions}>
+            <button className={styles.exportBtn} onClick={() => exportToCSV(jobs, getTotalDisplaySeconds(), tab)}>
+              Export CSV
+            </button>
+            <button className={styles.signOutBtn} onClick={handleSignOut}>
+              Sign Out
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
