@@ -7,7 +7,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:tz": "TZ=UTC vitest run && TZ=Asia/Tokyo vitest run && TZ=America/New_York vitest run",
+    "audit": "node scripts/audit.mjs",
+    "verify": "tsc -b --noEmit && eslint . && vitest run"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.104.1",
@@ -28,6 +33,7 @@
     "globals": "^17.5.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
-    "vite": "^8.0.10"
+    "vite": "^8.0.10",
+    "vitest": "^4.1.10"
   }
 }
