@@ -77,6 +77,16 @@ is gone" from "the app can't see the data," which are very different problems.
 
 Do this against a scratch Supabase project, not the shop's live data.
 
+### Sign-in states
+
+Check these first — they're pure render-order logic, and getting them wrong
+means the app never paints at all.
+
+1. Signed out, hard reload → **Login screen**, not a stuck spinner
+2. Sign in → job list appears
+3. Sign out → back to Login, no spinner
+4. Signed in, hard reload → brief spinner, then the list with totals intact
+
 ### The core loop
 
 1. Clock in → General starts counting automatically

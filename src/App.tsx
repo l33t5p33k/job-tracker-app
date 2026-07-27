@@ -193,8 +193,12 @@ export default function App() {
     return stranded
   }, [])
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
+  /**
+   * `silent` refreshes in the background without blanking the screen — used
+   * when the tab regains focus, where a full-page spinner would be jarring.
+   */
+  const loadData = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true)
     setError(null)
     setNotice(null)
 
@@ -325,7 +329,7 @@ export default function App() {
     function onVisible() {
       if (document.visibilityState === 'visible' && hasLoadedRef.current) {
         setNowMs(Date.now())
-        loadData()
+        loadData({ silent: true })
       }
     }
     document.addEventListener('visibilitychange', onVisible)
@@ -582,19 +586,20 @@ export default function App() {
   const activeJob = jobs.find(j => j.isRunning)
   const isClockedIn = !!session
 
-  if (authLoading || (loading && !error)) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.inner}>
-          <p style={{ color: '#71717a', textAlign: 'center', paddingTop: '48px' }}>Loading...</p>
-        </div>
+  const spinner = (
+    <div className={styles.container}>
+      <div className={styles.inner}>
+        <p style={{ color: '#71717a', textAlign: 'center', paddingTop: '48px' }}>Loading...</p>
       </div>
-    )
-  }
+    </div>
+  )
 
-  if (!authSession) {
-    return <Login />
-  }
+  // Order matters. `loading` starts true and only clears once loadData runs,
+  // and loadData only runs when authenticated — so checking it before the auth
+  // check strands a signed-out user on the spinner forever.
+  if (authLoading) return spinner
+  if (!authSession) return <Login />
+  if (loading && !error) return spinner
 
   return (
     <div className={styles.container}>
