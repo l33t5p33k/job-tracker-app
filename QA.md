@@ -48,11 +48,16 @@ something and a test that happens to pass on your machine.
 
 ---
 
-## Layer 2 — Database audit (5 seconds)
+## Layer 2 — Database healthcheck (5 seconds)
 
 ```bash
-pnpm audit
+pnpm healthcheck
 ```
+
+It prompts for your login (echo off, nothing written to disk — or set
+`SHOP_EMAIL` / `SHOP_PASSWORD` for CI). It has to sign in: RLS means an
+anonymous client sees zero rows in every table, which is indistinguishable from
+your data having vanished.
 
 Read-only. Answers the questions the UI can't:
 
@@ -106,7 +111,7 @@ means the app never paints at all.
 | Killed mid-shift | Clock in, start a job, close the tab, reopen | Job is not stuck "running" forever |
 | Fat-fingered double tap | Double-tap a job fast | One entry created, not two |
 | Job name with a comma | Add `Smith, John` → Export CSV | Opens in Excel as one column |
-| Two devices | Clock in on phone and laptop | Audit script warns about two open sessions |
+| Two devices | Clock in on phone and laptop | Healthcheck warns about two open sessions |
 
 ### Crossing boundaries
 
@@ -137,8 +142,79 @@ Reset your clock afterwards.
 | `strict: true` in tsconfig | Null-checking was off across the whole app |
 | In-flight guard on all writes | Double-tapping created two open entries |
 | Refetch on tab focus | A phone waking from sleep showed a stale timer |
-| CSV quoting | Job names containing commas broke the export |
+| CSV quoting + formula guard (`src/csv.ts`) | Commas broke the export; names starting `=` `+` `-` `@` executed as formulas in Excel |
 | `formatTime` clamps negatives | Clock skew could render `-1:-3:-20` |
+| All three date boundaries from one instant | Three separate `new Date()` calls could straddle midnight and yield a day outside its own week |
+| Entries with no `session_id` counted as stranded | They were being skipped by the orphan scan entirely — unrecoverable *and* unreported |
+| Sign-in render order | `loading` was checked before auth, stranding signed-out users on a permanent spinner |
+
+---
+
+## Security
+
+### Verified clean
+
+- No secrets anywhere in git history — scanned all branches for `service_role`,
+  `sb_secret`, `sbp_`, and JWT-shaped strings
+- `.env.local` is gitignored; only `.env.example` is tracked
+- The key in use is `sb_publishable_…`, not a service_role key
+- No `dangerouslySetInnerHTML`, `innerHTML`, `eval`, or `new Function` — React
+  escapes all job names on render
+- `mailto:` / `sms:` bodies are `encodeURIComponent`-encoded, so a job name
+  can't inject extra headers like `&bcc=`
+- `dist/` is not tracked
+
+### The one that matters: RLS
+
+**Your publishable key ships inside the public JS bundle. That is by design —
+row-level security is the only thing protecting this data.**
+
+Every query in the app is unscoped (`.from('jobs').select('*')` with no
+`user_id` filter), so whatever RLS allows is exactly what any visitor gets.
+`pnpm healthcheck` now tests this directly, hitting all three tables with an
+unauthenticated client:
+
+```
+Row-level security (unauthenticated client)
+  ✓ jobs: no rows visible anonymously
+  ✓ sessions: no rows visible anonymously
+  ✓ time_entries: no rows visible anonymously
+...
+  ✓ RLS confirmed: signed-in sees rows, anonymous sees none
+```
+
+Postgres RLS *filters* rather than erroring, so zero anonymous rows is the
+normal shape of a working policy — the confirmation line is what settles it,
+by comparing against the signed-in count. A `READABLE BY ANYONE` line is the
+failure case and needs fixing before this goes anywhere public. Minimum viable
+policy, signed-in users only:
+
+```sql
+alter table jobs         enable row level security;
+alter table sessions     enable row level security;
+alter table time_entries enable row level security;
+
+create policy "authenticated access" on jobs for all
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
+-- repeat for sessions and time_entries
+```
+
+That's the right shape for one shop where everyone shares the data. If you ever
+want per-user separation you'd add a `user_id` column defaulting to
+`auth.uid()` and scope on that instead — a schema change, worth doing
+deliberately rather than in a hurry.
+
+### Accepted, worth knowing
+
+- **Any signed-in user sees all jobs and hours.** Correct for a single shop,
+  wrong the moment you add a second one.
+- **Supabase error text is shown in the banner.** It can name tables or
+  policies. That diagnostic detail is the entire point of the change, and the
+  audience is shop staff, so it's a fair trade — but don't carry this pattern
+  into anything public-facing.
+- **Password auth only, no MFA or password reset flow.** Supabase rate-limits
+  sign-in attempts server-side.
 
 ---
 
@@ -168,7 +244,7 @@ Sources: [Project Pausing — Supabase Docs](https://supabase.com/docs/guides/pl
 ## Before each release
 
 ```bash
-pnpm verify && pnpm audit && pnpm build
+pnpm verify && pnpm healthcheck && pnpm build
 ```
 
 Then Layer 3's core loop. Everything else only when you've touched that area.

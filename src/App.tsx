@@ -3,6 +3,7 @@ import type { Session as AuthSession } from '@supabase/supabase-js'
 import { supabase } from './supabaseClient'
 import Login from './Login'
 import styles from './App.module.css'
+import { buildCsv } from './csv'
 import {
   startOfShopDay,
   startOfNextShopDay,
@@ -40,11 +41,6 @@ interface TimeEntry {
   duration_seconds?: number
 }
 
-/** RFC 4180 quoting. Job names are free text and routinely contain commas. */
-function csvCell(value: string): string {
-  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
-}
-
 function exportToCSV(jobs: Job[], sessionSeconds: number, tab: 'today' | 'week') {
   const rows = [
     ['Job Name', 'Total Time'],
@@ -55,8 +51,7 @@ function exportToCSV(jobs: Job[], sessionSeconds: number, tab: 'today' | 'week')
     [],
     [tab === 'today' ? 'Total Session Time' : 'Total Week Time', formatTime(sessionSeconds)]
   ]
-  const csv = rows.map(r => r.map(csvCell).join(',')).join('\r\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const blob = new Blob([buildCsv(rows)], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -155,12 +150,13 @@ export default function App() {
     if (openErr) throw openErr
     if (!openEntries?.length) return 0
 
-    const orphans = (openEntries as TimeEntry[]).filter(
-      e => e.session_id && e.session_id !== currentSessionId
-    )
+    const orphans = (openEntries as TimeEntry[]).filter(e => e.session_id !== currentSessionId)
     if (!orphans.length) return 0
 
-    const sessionIds = [...new Set(orphans.map(e => e.session_id!))]
+    // An entry with no session_id has no clock-out to recover from. It can't be
+    // fixed, so it's counted as stranded rather than quietly skipped.
+    const sessionIds = [...new Set(orphans.map(e => e.session_id).filter(Boolean))] as string[]
+    if (!sessionIds.length) return orphans.length
     const { data: parents, error: parentErr } = await supabase
       .from('sessions')
       .select('id, clocked_out_at')
@@ -175,7 +171,7 @@ export default function App() {
 
     let stranded = 0
     for (const entry of orphans) {
-      const endedAt = closedAt.get(entry.session_id!)
+      const endedAt = entry.session_id ? closedAt.get(entry.session_id) : undefined
       if (!endedAt) {
         stranded++
         continue
@@ -229,10 +225,13 @@ export default function App() {
       if (jobsErr) throw jobsErr
 
       // One fetch for the week; today is a subset, partitioned client-side so
-      // the two tabs can never disagree with each other.
-      const weekStart = startOfShopWeek()
-      const dayStart = startOfShopDay()
-      const nextDayStart = startOfNextShopDay()
+      // the two tabs can never disagree with each other. All three boundaries
+      // come from a single instant — calling new Date() three times could
+      // straddle midnight and produce a day that isn't inside its own week.
+      const now = new Date()
+      const weekStart = startOfShopWeek(now)
+      const dayStart = startOfShopDay(now)
+      const nextDayStart = startOfNextShopDay(now)
 
       const { data: weekEntries, error: entriesErr } = await supabase
         .from('time_entries')
